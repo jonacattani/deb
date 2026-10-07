@@ -115,7 +115,7 @@ g_totale <- ggplot(totale, aes(x = factor(anno), y = valore)) +
   scale_y_continuous(labels = \(x) num_es(x / 1e6),
                      expand = expansion(mult = c(0, 0.15))) +
   labs(
-    title = paste0("Trinidad y Tobago: ", testi$totale, ", ", periodo),
+    title = paste0("Trinidad y Tabago: ", testi$totale, ", ", periodo),
     subtitle = if (molti_anni) "Millones de US$." else
       "Millones de US$ y variaci\u00f3n respecto al a\u00f1o anterior.",
     x = NULL, y = NULL, caption = fonte
@@ -168,7 +168,7 @@ g_storico <- ggplot(storico, aes(x = anno, y = valore)) +
   scale_y_continuous(labels = \(x) num_es(x / 1e6), limits = c(0, NA),
                      expand = expansion(mult = c(0, 0.12))) +
   labs(
-    title = paste0("Trinidad y Tobago: ", testi$socios, ", ", periodo),
+    title = paste0("Trinidad y Tabago: ", testi$socios, ", ", periodo),
     subtitle = paste0(
       "Millones de US$. Los ", n_partner, " principales ", testi$partner, " de ", ultimo_anno,
       ". Cada panel tiene su propia escala vertical."
