@@ -1,5 +1,5 @@
-# Grafici a barre orizzontali: principali destinazioni dell'export di
-# Trinidad e Tobago, un'immagine PNG per anno.
+# Grafici a barre orizzontali: principali partner di Trinidad e Tobago
+# (export o import, vedi `flusso`), un'immagine PNG per anno.
 #
 # Input: Excel "largo" con colonne partner_iso, partner_desc, 2020, 2021, ...
 # (valori in US$). Output: un PNG per anno nella cartella `cartella_out`.
@@ -16,7 +16,27 @@ library(scales)
 
 # Parametri -------------------------------------------------------------------
 
-file_excel  <- "C:/Users/giova/OneDrive/Desktop/CEPAL/Network Analysis/Casos de Estudio/Trinidad and Tobago/Data/TTO_exportaciones.xlsx"
+# "exportaciones" oppure "importaciones": cambia testi dei grafici e nomi dei file
+flusso <- "exportaciones"
+
+testi <- list(
+  exportaciones = list(
+    barre   = "principales destinos de exportaci\u00f3n",
+    quota   = "total exportado",
+    totale  = "valor total exportado",
+    socios  = "exportaciones a sus principales destinos",
+    partner = "destinos"
+  ),
+  importaciones = list(
+    barre   = "principales or\u00edgenes de importaci\u00f3n",
+    quota   = "total importado",
+    totale  = "valor total importado",
+    socios  = "importaciones desde sus principales or\u00edgenes",
+    partner = "or\u00edgenes"
+  )
+)[[flusso]]
+
+file_excel  <- paste0("C:/Users/giova/OneDrive/Desktop/CEPAL/Network Analysis/Casos de Estudio/Trinidad and Tobago/Data/TTO_", flusso, "_2006_2025.xlsx")
 cartella_out <- "C:/Users/giova/OneDrive/Desktop/CEPAL/Network Analysis/Casos de Estudio/Trinidad and Tobago/Graficos"
 n_top       <- 15
 fonte       <- "Fuente: elaboraci\u00f3n propia con datos de UN Comtrade."
@@ -30,7 +50,7 @@ dir.create(cartella_out, showWarnings = FALSE, recursive = TRUE)
 
 # Dati ------------------------------------------------------------------------
 
-export <- read_excel(file_excel) |>
+dati <- read_excel(file_excel) |>
   pivot_longer(-c(partner_iso, partner_desc),
                names_to = "anno", values_to = "valore") |>
   filter(!is.na(valore), valore > 0) |>
@@ -38,11 +58,11 @@ export <- read_excel(file_excel) |>
 
 # Nomi dei paesi in spagnolo se c'è countrycode, altrimenti quelli di Comtrade
 nomi_es <- if (requireNamespace("countrycode", quietly = TRUE)) {
-  suppressWarnings(countrycode::countrycode(export$partner_iso, "iso3c", "cldr.short.es"))
+  suppressWarnings(countrycode::countrycode(dati$partner_iso, "iso3c", "cldr.short.es"))
 } else {
   NA_character_
 }
-export <- export |>
+dati <- dati |>
   mutate(
     paese = coalesce(nomi_es, partner_desc),
     paese = recode(paese, "USA" = "United States")
@@ -51,7 +71,7 @@ export <- export |>
 # Accenti scritti come \u00f3 (= ó) per evitare problemi di codifica del file
 
 # Stessa scala in tutti i grafici: asse da 0 al valore massimo di tutti gli anni
-max_globale <- max(export$valore)
+max_globale <- max(dati$valore)
 
 # Formato numeri spagnolo: 1.234,5
 num_es <- function(x, acc = 1) number(x, accuracy = acc, big.mark = ".", decimal.mark = ",")
@@ -59,7 +79,7 @@ num_es <- function(x, acc = 1) number(x, accuracy = acc, big.mark = ".", decimal
 # Grafico per un anno ---------------------------------------------------------
 
 grafico_anno <- function(a) {
-  dati_anno <- export |> filter(anno == a)
+  dati_anno <- dati |> filter(anno == a)
   totale <- sum(dati_anno$valore)
 
   top <- dati_anno |>
@@ -82,9 +102,9 @@ grafico_anno <- function(a) {
       expand = expansion(mult = 0)
     ) +
     labs(
-      title = paste0("Trinidad y Tobago: principales destinos de exportaci\u00f3n, ", a),
+      title = paste0("Trinidad y Tobago: ", testi$barre, ", ", a),
       subtitle = paste0(
-        "Millones de US$ y participaci\u00f3n en el total exportado.\n",
+        "Millones de US$ y participaci\u00f3n en el ", testi$quota, ".\n",
         "Los ", nrow(top), " principales socios concentran el ",
         num_es(100 * quota_top, 0.1), "% del total (US$ ",
         num_es(totale / 1e6), " millones)."
@@ -116,13 +136,13 @@ grafico_anno <- function(a) {
 # Tutti i grafici ricevono la stessa larghezza per i nomi dei paesi, cosi'
 # l'area delle barre resta nella stessa posizione in ogni immagine.
 
-anni <- sort(unique(export$anno))
+anni <- sort(unique(dati$anno))
 grafici <- lapply(anni, \(a) ggplotGrob(grafico_anno(a)))
 larghezze <- do.call(grid::unit.pmax, lapply(grafici, \(g) g$widths))
 
 for (i in seq_along(anni)) {
   grafici[[i]]$widths <- larghezze
-  file_png <- file.path(cartella_out, paste0("TTO_exportaciones_", anni[i], ".png"))
+  file_png <- file.path(cartella_out, paste0("TTO_", flusso, "_", anni[i], ".png"))
   ggsave(file_png, grafici[[i]], width = 9, height = 6.5, dpi = 300, bg = "white")
   message("Salvato: ", file_png)
 }

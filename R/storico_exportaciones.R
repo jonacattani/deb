@@ -1,4 +1,4 @@
-# Storico dell'export di Trinidad e Tobago:
+# Storico dell'export o dell'import di Trinidad e Tobago (vedi `flusso`):
 #   1. valore totale esportato per anno (colonne)
 #   2. evoluzione dei principali partner dell'ultimo anno (un pannello per paese)
 #
@@ -17,7 +17,27 @@ library(scales)
 
 # Parametri -------------------------------------------------------------------
 
-file_excel   <- "C:/Users/giova/OneDrive/Desktop/CEPAL/Network Analysis/Casos de Estudio/Trinidad and Tobago/Data/TTO_exportaciones.xlsx"
+# "exportaciones" oppure "importaciones": cambia testi dei grafici e nomi dei file
+flusso <- "exportaciones"
+
+testi <- list(
+  exportaciones = list(
+    barre   = "principales destinos de exportaci\u00f3n",
+    quota   = "total exportado",
+    totale  = "valor total exportado",
+    socios  = "exportaciones a sus principales destinos",
+    partner = "destinos"
+  ),
+  importaciones = list(
+    barre   = "principales or\u00edgenes de importaci\u00f3n",
+    quota   = "total importado",
+    totale  = "valor total importado",
+    socios  = "importaciones desde sus principales or\u00edgenes",
+    partner = "or\u00edgenes"
+  )
+)[[flusso]]
+
+file_excel   <- paste0("C:/Users/giova/OneDrive/Desktop/CEPAL/Network Analysis/Casos de Estudio/Trinidad and Tobago/Data/TTO_", flusso, "_2006_2025.xlsx")
 cartella_out <- "C:/Users/giova/OneDrive/Desktop/CEPAL/Network Analysis/Casos de Estudio/Trinidad and Tobago/Graficos"
 n_partner    <- 8      # quanti partner nello storico (i principali dell'ultimo anno)
 fonte        <- "Fuente: elaboraci\u00f3n propia con datos de UN Comtrade."
@@ -31,18 +51,18 @@ dir.create(cartella_out, showWarnings = FALSE, recursive = TRUE)
 
 # Dati ------------------------------------------------------------------------
 
-export <- read_excel(file_excel) |>
+dati <- read_excel(file_excel) |>
   pivot_longer(-c(partner_iso, partner_desc),
                names_to = "anno", values_to = "valore") |>
   filter(!is.na(valore), valore > 0) |>
   mutate(anno = as.integer(anno))
 
 nomi_es <- if (requireNamespace("countrycode", quietly = TRUE)) {
-  suppressWarnings(countrycode::countrycode(export$partner_iso, "iso3c", "cldr.short.es"))
+  suppressWarnings(countrycode::countrycode(dati$partner_iso, "iso3c", "cldr.short.es"))
 } else {
   NA_character_
 }
-export <- export |>
+dati <- dati |>
   mutate(
     paese = coalesce(nomi_es, partner_desc),
     paese = recode(paese, "USA" = "United States")
@@ -50,7 +70,7 @@ export <- export |>
 
 num_es <- function(x, acc = 1) number(x, accuracy = acc, big.mark = ".", decimal.mark = ",")
 
-anni <- sort(unique(export$anno))
+anni <- sort(unique(dati$anno))
 ultimo_anno <- max(anni)
 periodo <- paste0(min(anni), "-", ultimo_anno)
 
@@ -77,7 +97,7 @@ tema <- theme_minimal(base_size = 11) +
 
 # 1. Totale esportato per anno ------------------------------------------------
 
-totale <- export |>
+totale <- dati |>
   group_by(anno) |>
   summarise(valore = sum(valore), .groups = "drop") |>
   mutate(var_pct = 100 * (valore / lag(valore) - 1))
@@ -95,26 +115,26 @@ g_totale <- ggplot(totale, aes(x = factor(anno), y = valore)) +
   scale_y_continuous(labels = \(x) num_es(x / 1e6),
                      expand = expansion(mult = c(0, 0.15))) +
   labs(
-    title = paste0("Trinidad y Tobago: valor total exportado, ", periodo),
+    title = paste0("Trinidad y Tobago: ", testi$totale, ", ", periodo),
     subtitle = if (molti_anni) "Millones de US$." else
       "Millones de US$ y variaci\u00f3n respecto al a\u00f1o anterior.",
     x = NULL, y = NULL, caption = fonte
   ) +
   tema
 
-ggsave(file.path(cartella_out, paste0("TTO_exportaciones_total_", periodo, ".png")),
+ggsave(file.path(cartella_out, paste0("TTO_", flusso, "_total_", periodo, ".png")),
        g_totale, width = if (molti_anni) 12 else 9, height = 5.5, dpi = 300, bg = "white")
 
 # 2. Evoluzione dei principali partner ----------------------------------------
 # Un pannello per paese, ognuno con la propria scala: gli Stati Uniti valgono
 # molto di piu' degli altri e con una scala unica le altre linee sarebbero piatte.
 
-top_iso <- export |>
+top_iso <- dati |>
   filter(anno == ultimo_anno) |>
   slice_max(valore, n = n_partner, with_ties = FALSE) |>
   pull(partner_iso)
 
-storico <- export |>
+storico <- dati |>
   filter(partner_iso %in% top_iso) |>
   complete(nesting(partner_iso, paese), anno = anni) |>   # anni mancanti = NA
   group_by(partner_iso) |>
@@ -148,9 +168,9 @@ g_storico <- ggplot(storico, aes(x = anno, y = valore)) +
   scale_y_continuous(labels = \(x) num_es(x / 1e6), limits = c(0, NA),
                      expand = expansion(mult = c(0, 0.12))) +
   labs(
-    title = paste0("Trinidad y Tobago: exportaciones a sus principales destinos, ", periodo),
+    title = paste0("Trinidad y Tobago: ", testi$socios, ", ", periodo),
     subtitle = paste0(
-      "Millones de US$. Los ", n_partner, " principales destinos de ", ultimo_anno,
+      "Millones de US$. Los ", n_partner, " principales ", testi$partner, " de ", ultimo_anno,
       ". Cada panel tiene su propia escala vertical."
     ),
     x = NULL, y = NULL, caption = fonte
@@ -164,7 +184,7 @@ g_storico <- ggplot(storico, aes(x = anno, y = valore)) +
     axis.text.x = element_text(size = 8.5)
   )
 
-ggsave(file.path(cartella_out, paste0("TTO_exportaciones_socios_", periodo, ".png")),
+ggsave(file.path(cartella_out, paste0("TTO_", flusso, "_socios_", periodo, ".png")),
        g_storico, width = 11, height = 6.5, dpi = 300, bg = "white")
 
 message("Grafici salvati in ", cartella_out)
