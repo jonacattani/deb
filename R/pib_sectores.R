@@ -2,10 +2,12 @@
 # Fonte: CSO, Table 2.2A2 "Gross Domestic Product by Economic Activity -
 # Percentage Contribution (Constant Prices)".
 #
-# Produce tre grafici:
+# Produce cinque grafici:
 #   1. composizione del PIL nell'ultimo anno (barre orizzontali)
 #   2. cambiamento della struttura tra il primo e l'ultimo anno (dumbbell)
 #   3. peso del settore energetico nel PIL nel tempo (aree impilate)
+#   4. composizione del settore energetico nell'ultimo anno (barre per sottosettore)
+#   5. composizione del PIL con la parte energetica evidenziata in ogni settore
 #
 # Pacchetti: install.packages(c("tidyverse", "readxl", "scales", "ragg"))
 
@@ -120,7 +122,7 @@ g_composizione <- ggplot(ultimo, aes(x = quota, y = settore)) +
   geom_col(fill = colore_barre, width = 0.62) +
   geom_text(aes(label = paste0(num_es(quota), "%")), hjust = 0,
             nudge_x = 0.3, size = 3.2, colour = colore_testo_2) +
-  scale_x_continuous(labels = \(x) paste0(x, "%"),
+  scale_x_continuous(labels = label_number(decimal.mark = ",", big.mark = ".", suffix = "%"),
                      expand = expansion(mult = c(0, 0.1))) +
   labs(
     title = paste0("Trinidad y Tobago: composici\u00f3n del PIB por actividad econ\u00f3mica, ",
@@ -158,7 +160,7 @@ g_confronto <- ggplot(confronto, aes(y = settore)) +
   geom_point(aes(x = fine), colour = colore_barre, size = 3) +
   geom_text(aes(x = pmax(inizio, fine), label = etichetta), hjust = 0,
             nudge_x = 0.6, size = 3.1, colour = colore_testo_2) +
-  scale_x_continuous(labels = \(x) paste0(x, "%"),
+  scale_x_continuous(labels = label_number(decimal.mark = ",", big.mark = ".", suffix = "%"),
                      expand = expansion(mult = c(0.02, 0.14))) +
   labs(
     title = paste0("Trinidad y Tobago: cambio en la estructura del PIB, ",
@@ -210,7 +212,7 @@ g_energia <- ggplot(energia, aes(x = anno, y = quota, fill = gruppo)) +
   scale_fill_manual(values = colori_energia, name = NULL) +
   scale_x_continuous(breaks = seq(primo_anno, ultimo_anno, by = 2),
                      expand = expansion(add = c(0.2, 4.2))) +
-  scale_y_continuous(labels = \(x) paste0(x, "%"),
+  scale_y_continuous(labels = label_number(decimal.mark = ",", big.mark = ".", suffix = "%"),
                      expand = expansion(mult = c(0, 0.1))) +
   coord_cartesian(clip = "off") +
   labs(
@@ -231,5 +233,122 @@ g_energia <- ggplot(energia, aes(x = anno, y = quota, fill = gruppo)) +
 
 ggsave(file.path(cartella_out, paste0("TTO_PIB_energia_", primo_anno, "_", ultimo_anno, ".png")),
        g_energia, width = 11, height = 6.5, dpi = 300, bg = "white")
+
+# 4. Composizione del settore energetico nell'ultimo anno -------------------------
+
+nomi_energia <- c(
+  B1 = "Extracci\u00f3n de petr\u00f3leo crudo",
+  B2 = "Extracci\u00f3n de condensado",
+  B3 = "Extracci\u00f3n de gas natural",
+  B4 = "Servicios de apoyo petrolero y asfalto",
+  B5 = "Servicios de apoyo petrolero y asfalto",
+  C1 = "Refinaci\u00f3n (incl. GNL)",
+  C2 = "Petroqu\u00edmica",
+  G1 = "Distribuci\u00f3n de petr\u00f3leo y gas natural"
+)
+fase_energia <- c(
+  B = "Extracci\u00f3n (miner\u00eda)",
+  C = "Transformaci\u00f3n (manufactura)",
+  G = "Distribuci\u00f3n (comercio)"
+)
+
+sottosettori <- pil |>
+  filter(isic %in% names(nomi_energia), anno == ultimo_anno) |>
+  mutate(nome = nomi_energia[isic], fase = substr(isic, 1, 1)) |>
+  group_by(nome, fase) |>
+  summarise(quota = sum(quota), .groups = "drop") |>
+  mutate(
+    nome = fct_reorder(nome, quota),
+    fase = factor(fase_energia[fase], levels = fase_energia),
+    quota_settore = 100 * quota / sum(quota),
+    etichetta = paste0(num_es(quota), "% del PIB  (", num_es(quota_settore, 1),
+                       "% del sector)")
+  )
+
+g_sottosettori <- ggplot(sottosettori, aes(x = quota, y = nome, fill = fase)) +
+  geom_col(width = 0.62) +
+  geom_text(aes(label = etichetta), hjust = 0, nudge_x = 0.08,
+            size = 3.2, colour = colore_testo_2) +
+  scale_fill_manual(values = colori_energia[1:3], name = NULL) +
+  scale_x_continuous(labels = label_number(decimal.mark = ",", big.mark = ".", suffix = "%"),
+                     expand = expansion(mult = c(0, 0.45))) +
+  labs(
+    title = paste0("Trinidad y Tobago: composici\u00f3n del sector energ\u00e9tico, ",
+                   ultimo_anno),
+    subtitle = paste0(
+      "Participaci\u00f3n porcentual en el PIB a precios constantes. El sector energ\u00e9tico ",
+      "representa el ", num_es(sum(sottosettori$quota)), "% del PIB.\n",
+      "Entre par\u00e9ntesis, participaci\u00f3n en el total del sector energ\u00e9tico."
+    ),
+    x = NULL, y = NULL, caption = fonte
+  ) +
+  tema +
+  theme(legend.position = "top", legend.justification = "left",
+        legend.text = element_text(size = 9.5, colour = colore_testo),
+        legend.key.size = unit(10, "pt"),
+        panel.grid.major.y = element_blank(),
+        panel.grid.major.x = element_line(colour = colore_griglia, linewidth = 0.4))
+
+ggsave(file.path(cartella_out, paste0("TTO_PIB_energia_composicion_", ultimo_anno, ".png")),
+       g_sottosettori, width = 10, height = 5.5, dpi = 300, bg = "white")
+
+# 5. PIL per settore con la parte energetica evidenziata -------------------------
+# L'energia non e' una sezione ISIC: sta dentro minas (B), manufactura (C) e
+# comercio (G). Qui ogni barra e' divisa in parte energetica e resto.
+
+parte_energia <- pil |>
+  filter(isic %in% names(nomi_energia), anno == ultimo_anno) |>
+  mutate(sezione = substr(isic, 1, 1)) |>
+  group_by(sezione) |>
+  summarise(energia = sum(quota), .groups = "drop")
+
+evidenziato <- ultimo |>
+  mutate(settore = as.character(settore)) |>
+  left_join(parte_energia, by = c("isic" = "sezione")) |>
+  mutate(energia = coalesce(energia, 0), resto = quota - energia,
+         settore = fct_reorder(settore, quota)) |>
+  pivot_longer(c(energia, resto), names_to = "parte", values_to = "valore") |>
+  mutate(parte = factor(parte, levels = c("resto", "energia"),
+                        labels = c("Resto de la actividad", "Sector energ\u00e9tico")))
+
+etichette_evid <- evidenziato |>
+  group_by(settore) |>
+  summarise(totale = sum(valore),
+            energia = sum(valore[parte == "Sector energ\u00e9tico"]), .groups = "drop") |>
+  mutate(testo = if_else(energia > 0,
+                         paste0(num_es(totale), "%  (energ\u00eda: ", num_es(energia), "%)"),
+                         paste0(num_es(totale), "%")))
+
+g_evidenziato <- ggplot(evidenziato, aes(x = valore, y = settore, fill = parte)) +
+  geom_col(width = 0.62) +
+  geom_text(data = etichette_evid, aes(x = totale, y = settore, label = testo),
+            inherit.aes = FALSE, hjust = 0, nudge_x = 0.3, size = 3.1,
+            colour = colore_testo_2) +
+  scale_fill_manual(values = c("Resto de la actividad" = colore_chiaro,
+                               "Sector energ\u00e9tico" = colore_barre),
+                    breaks = c("Sector energ\u00e9tico", "Resto de la actividad"),
+                    name = NULL) +
+  scale_x_continuous(labels = label_number(decimal.mark = ",", big.mark = ".", suffix = "%"),
+                     expand = expansion(mult = c(0, 0.25))) +
+  labs(
+    title = paste0("Trinidad y Tobago: composici\u00f3n del PIB y peso de la energ\u00eda, ",
+                   ultimo_anno),
+    subtitle = paste0(
+      "Participaci\u00f3n porcentual en el PIB a precios constantes. ",
+      "La parte energ\u00e9tica suma el ", num_es(sum(parte_energia$energia)), "% del PIB:\n",
+      "extracci\u00f3n en miner\u00eda, refinaci\u00f3n y petroqu\u00edmica en manufactura, ",
+      "distribuci\u00f3n de combustibles en comercio."
+    ),
+    x = NULL, y = NULL, caption = fonte
+  ) +
+  tema +
+  theme(legend.position = "top", legend.justification = "left",
+        legend.text = element_text(size = 9.5, colour = colore_testo),
+        legend.key.size = unit(10, "pt"),
+        panel.grid.major.y = element_blank(),
+        panel.grid.major.x = element_line(colour = colore_griglia, linewidth = 0.4))
+
+ggsave(file.path(cartella_out, paste0("TTO_PIB_composicion_energia_", ultimo_anno, ".png")),
+       g_evidenziato, width = 10, height = 7.5, dpi = 300, bg = "white")
 
 message("Grafici salvati in ", cartella_out)
