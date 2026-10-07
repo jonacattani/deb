@@ -54,6 +54,9 @@ anni <- sort(unique(export$anno))
 ultimo_anno <- max(anni)
 periodo <- paste0(min(anni), "-", ultimo_anno)
 
+# Con molti anni (es. 20) i grafici si allargano e le etichette si riducono
+molti_anni <- length(anni) > 10
+
 tema <- theme_minimal(base_size = 11) +
   theme(
     plot.title.position = "plot",
@@ -82,8 +85,10 @@ totale <- export |>
 g_totale <- ggplot(totale, aes(x = factor(anno), y = valore)) +
   geom_col(fill = colore_barre, width = 0.6) +
   geom_text(aes(label = num_es(valore / 1e6)), vjust = -0.6,
-            size = 3.6, colour = colore_testo, fontface = "bold") +
-  geom_text(aes(label = if_else(is.na(var_pct), "",
+            size = if (molti_anni) 2.8 else 3.6, colour = colore_testo,
+            fontface = "bold") +
+  # la variazione % solo se c'e' spazio (fino a 10 anni)
+  geom_text(aes(label = if_else(is.na(var_pct) | molti_anni, "",
                                 paste0(if_else(var_pct >= 0, "+", ""),
                                        num_es(var_pct, 0.1), "%"))),
             vjust = -2.6, size = 3.1, colour = colore_testo_2) +
@@ -91,13 +96,14 @@ g_totale <- ggplot(totale, aes(x = factor(anno), y = valore)) +
                      expand = expansion(mult = c(0, 0.15))) +
   labs(
     title = paste0("Trinidad y Tobago: valor total exportado, ", periodo),
-    subtitle = "Millones de US$ y variaci\u00f3n respecto al a\u00f1o anterior.",
+    subtitle = if (molti_anni) "Millones de US$." else
+      "Millones de US$ y variaci\u00f3n respecto al a\u00f1o anterior.",
     x = NULL, y = NULL, caption = fonte
   ) +
   tema
 
 ggsave(file.path(cartella_out, paste0("TTO_exportaciones_total_", periodo, ".png")),
-       g_totale, width = 9, height = 5.5, dpi = 300, bg = "white")
+       g_totale, width = if (molti_anni) 12 else 9, height = 5.5, dpi = 300, bg = "white")
 
 # 2. Evoluzione dei principali partner ----------------------------------------
 # Un pannello per paese, ognuno con la propria scala: gli Stati Uniti valgono
@@ -116,6 +122,9 @@ storico <- export |>
   ungroup() |>
   mutate(paese = fct_reorder(paese, ordine, .desc = TRUE))
 
+# distanza tra punto ed etichetta, proporzionale al numero di anni
+scarto <- 0.035 * diff(range(anni))
+
 # etichette solo sul primo e sull'ultimo anno: a sinistra del primo punto e a
 # destra dell'ultimo, cosi' non si sovrappongono alla linea
 estremi <- storico |>
@@ -124,18 +133,18 @@ estremi <- storico |>
   filter(anno %in% range(anno)) |>
   mutate(primo = anno == min(anno)) |>
   ungroup() |>
-  mutate(x_testo = if_else(primo, anno - 0.18, anno + 0.18),
+  mutate(x_testo = if_else(primo, anno - scarto, anno + scarto),
          allinea = if_else(primo, 1, 0))
 
 g_storico <- ggplot(storico, aes(x = anno, y = valore)) +
-  geom_line(colour = colore_barre, linewidth = 0.9, na.rm = TRUE) +
-  geom_point(colour = colore_barre, size = 2, na.rm = TRUE) +
+  geom_line(colour = colore_barre, linewidth = if (molti_anni) 0.7 else 0.9, na.rm = TRUE) +
+  geom_point(colour = colore_barre, size = if (molti_anni) 1.2 else 2, na.rm = TRUE) +
   geom_text(data = estremi,
             aes(x = x_testo, label = num_es(valore / 1e6), hjust = allinea),
             size = 3, colour = colore_testo) +
   facet_wrap(~ paese, ncol = 4, scales = "free_y") +
   coord_cartesian(clip = "off") +   # le etichette possono uscire dal pannello
-  scale_x_continuous(breaks = range(anni), expand = expansion(add = 1.1)) +
+  scale_x_continuous(breaks = range(anni), expand = expansion(add = 0.2 * diff(range(anni)) + 0.1)) +
   scale_y_continuous(labels = \(x) num_es(x / 1e6), limits = c(0, NA),
                      expand = expansion(mult = c(0, 0.12))) +
   labs(
