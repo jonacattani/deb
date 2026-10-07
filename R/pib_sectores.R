@@ -20,7 +20,7 @@ library(scales)
 
 file_excel   <- "C:/Users/giova/OneDrive/Desktop/CEPAL/Network Analysis/Casos de Estudio/Trinidad and Tobago/Data/Constant-Price-AGDP-2025-Percentage-Contribution.xlsx"
 cartella_out <- "C:/Users/giova/OneDrive/Desktop/CEPAL/Network Analysis/Casos de Estudio/Trinidad and Tobago/Graficos"
-fonte <- "Fuente: elaboraci\u00f3n propia con datos de la Central Statistical Office (CSO) de Trinidad y Tabago."
+fonte <- "Fuente: elaboraci\u00f3n propia con datos de la Central Statistical Office (CSO) de Trinidad y Tobago."
 
 colore_barre   <- "#2a78d6"
 colore_chiaro  <- "#a9c8ef"   # stessa tonalita' piu' chiara, per l'anno iniziale
@@ -123,7 +123,7 @@ g_composizione <- ggplot(ultimo, aes(x = quota, y = settore)) +
   scale_x_continuous(labels = \(x) paste0(x, "%"),
                      expand = expansion(mult = c(0, 0.1))) +
   labs(
-    title = paste0("Trinidad y Tabago: composici\u00f3n del PIB por actividad econ\u00f3mica, ",
+    title = paste0("Trinidad y Tobago: composici\u00f3n del PIB por actividad econ\u00f3mica, ",
                    ultimo_anno),
     subtitle = paste0(
       "Participaci\u00f3n porcentual en el PIB a precios constantes. ",
@@ -161,7 +161,7 @@ g_confronto <- ggplot(confronto, aes(y = settore)) +
   scale_x_continuous(labels = \(x) paste0(x, "%"),
                      expand = expansion(mult = c(0.02, 0.14))) +
   labs(
-    title = paste0("Trinidad y Tabago: cambio en la estructura del PIB, ",
+    title = paste0("Trinidad y Tobago: cambio en la estructura del PIB, ",
                    primo_anno, " y ", ultimo_anno),
     subtitle = paste0(
       "Participaci\u00f3n porcentual en el PIB a precios constantes.\n",
@@ -214,7 +214,7 @@ g_energia <- ggplot(energia, aes(x = anno, y = quota, fill = gruppo)) +
                      expand = expansion(mult = c(0, 0.1))) +
   coord_cartesian(clip = "off") +
   labs(
-    title = paste0("Trinidad y Tabago: peso del sector energ\u00e9tico en el PIB, ",
+    title = paste0("Trinidad y Tobago: peso del sector energ\u00e9tico en el PIB, ",
                    primo_anno, "-", ultimo_anno),
     subtitle = paste0(
       "Participaci\u00f3n porcentual en el PIB a precios constantes. ",

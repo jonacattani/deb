@@ -102,7 +102,7 @@ grafico_anno <- function(a) {
       expand = expansion(mult = 0)
     ) +
     labs(
-      title = paste0("Trinidad y Tabago: ", testi$barre, ", ", a),
+      title = paste0("Trinidad y Tobago: ", testi$barre, ", ", a),
       subtitle = paste0(
         "Millones de US$ y participaci\u00f3n en el ", testi$quota, ".\n",
         "Los ", nrow(top), " principales socios concentran el ",
