@@ -1,11 +1,12 @@
-# Cosa esporta Trinidad e Tobago: composizione dell'export per prodotto.
+# Cosa esporta (o importa) Trinidad e Tobago: composizione per prodotto.
 #
 # Input: Excel con cmdCode (HS a 6 cifre), cmdDesc e una colonna per anno
-# (valori in US$), come TTO_exportaciones_por_producto.xlsx.
+# (valori in US$), come TTO_exportaciones_por_producto.xlsx o
+# TTO_importaciones_por_producto.xlsx.
 #
 # Produce due grafici:
-#   1. i principali prodotti esportati nell'ultimo anno (barre orizzontali)
-#   2. composizione dell'export per grandi gruppi di prodotti, anno per anno
+#   1. i principali prodotti nell'ultimo anno (barre orizzontali)
+#   2. composizione per grandi gruppi di prodotti, anno per anno
 #
 # Pacchetti: install.packages(c("tidyverse", "readxl", "scales", "ragg"))
 
@@ -18,7 +19,10 @@ library(scales)
 
 # Parametri -------------------------------------------------------------------
 
-file_excel   <- "C:/Users/giova/OneDrive/Desktop/CEPAL/Network Analysis/Casos de Estudio/Trinidad and Tobago/Data/TTO_exportaciones_por_producto.xlsx"
+# "exportaciones" oppure "importaciones": cambia gruppi, testi e nomi dei file
+flusso <- "exportaciones"
+
+file_excel   <- paste0("C:/Users/giova/OneDrive/Desktop/CEPAL/Network Analysis/Casos de Estudio/Trinidad and Tobago/Data/TTO_", flusso, "_por_producto.xlsx")
 cartella_out <- "C:/Users/giova/OneDrive/Desktop/CEPAL/Network Analysis/Casos de Estudio/Trinidad and Tobago/Graficos"
 n_top <- 15
 fonte <- "Fuente: elaboraci\u00f3n propia con datos de UN Comtrade."
@@ -30,28 +34,62 @@ colore_griglia <- "#e6e5e1"
 dir.create(cartella_out, showWarnings = FALSE, recursive = TRUE)
 
 # Gruppi di prodotti per capitolo HS (prime due cifre) ---------------------------
+# Gruppi diversi per export e import, perche' i due panieri sono molto diversi.
 
 gruppo_hs <- function(codice) {
   cap <- as.integer(substr(codice, 1, 2))
-  case_when(
-    cap == 27                ~ "Hidrocarburos (cap. 27)",
-    cap %in% c(28, 29, 31)   ~ "Petroqu\u00edmica y fertilizantes (cap. 28, 29, 31)",
-    cap %in% c(72, 73)       ~ "Hierro y acero (cap. 72, 73)",
-    cap <= 24                ~ "Alimentos y bebidas (cap. 1-24)",
-    TRUE                     ~ "Resto"
-  )
+  if (flusso == "exportaciones") {
+    case_when(
+      cap == 27                ~ "Hidrocarburos (cap. 27)",
+      cap %in% c(28, 29, 31)   ~ "Petroqu\u00edmica y fertilizantes (cap. 28, 29, 31)",
+      cap %in% c(72, 73)       ~ "Hierro y acero (cap. 72, 73)",
+      cap <= 24                ~ "Alimentos y bebidas (cap. 1-24)",
+      TRUE                     ~ "Resto"
+    )
+  } else {
+    case_when(
+      cap %in% c(84, 85)       ~ "Maquinaria y equipo el\u00e9ctrico (cap. 84, 85)",
+      cap %in% 86:89           ~ "Veh\u00edculos y embarcaciones (cap. 86-89)",
+      cap <= 24                ~ "Alimentos y bebidas (cap. 1-24)",
+      cap %in% 28:40           ~ "Qu\u00edmicos, f\u00e1rmacos y pl\u00e1sticos (cap. 28-40)",
+      cap %in% c(25, 26, 72:83) ~ "Minerales y metales (cap. 25, 26, 72-83)",
+      cap == 27                ~ "Combustibles (cap. 27)",
+      TRUE                     ~ "Resto"
+    )
+  }
 }
-livelli_gruppi <- c(
-  "Hidrocarburos (cap. 27)",
-  "Petroqu\u00edmica y fertilizantes (cap. 28, 29, 31)",
-  "Hierro y acero (cap. 72, 73)",
-  "Alimentos y bebidas (cap. 1-24)",
-  "Resto"
-)
+livelli_gruppi <- if (flusso == "exportaciones") {
+  c("Hidrocarburos (cap. 27)",
+    "Petroqu\u00edmica y fertilizantes (cap. 28, 29, 31)",
+    "Hierro y acero (cap. 72, 73)",
+    "Alimentos y bebidas (cap. 1-24)",
+    "Resto")
+} else {
+  c("Maquinaria y equipo el\u00e9ctrico (cap. 84, 85)",
+    "Veh\u00edculos y embarcaciones (cap. 86-89)",
+    "Alimentos y bebidas (cap. 1-24)",
+    "Qu\u00edmicos, f\u00e1rmacos y pl\u00e1sticos (cap. 28-40)",
+    "Minerales y metales (cap. 25, 26, 72-83)",
+    "Combustibles (cap. 27)",
+    "Resto")
+}
+# palette categorica in ordine fisso; "Resto" sempre grigio
+palette_cat <- c("#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300")
 colori_gruppi <- setNames(
-  c("#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#b4b3ad"),
+  c(palette_cat[seq_len(length(livelli_gruppi) - 1)], "#b4b3ad"),
   livelli_gruppi
 )
+
+testi <- list(
+  exportaciones = list(prodotti = "principales productos de exportaci\u00f3n",
+                       totale = "total exportado",
+                       gruppi = "exportaciones por grupo de productos",
+                       verbo = "exportado"),
+  importaciones = list(prodotti = "principales productos de importaci\u00f3n",
+                       totale = "total importado",
+                       gruppi = "importaciones por grupo de productos",
+                       verbo = "importado")
+)[[flusso]]
 
 # Nomi brevi in spagnolo per i prodotti principali (gli altri: descrizione Comtrade)
 nomi_prodotti <- c(
@@ -75,7 +113,32 @@ nomi_prodotti <- c(
   "481810" = "Papel higi\u00e9nico",
   "701090" = "Envases de vidrio",
   "220300" = "Cerveza de malta",
-  "180631" = "Chocolate relleno"
+  "180631" = "Chocolate relleno",
+  # importazioni
+  "260112" = "Mineral de hierro aglomerado (pellets)",
+  "870340" = "Veh\u00edculos h\u00edbridos (gasolina y el\u00e9ctrico)",
+  "300490" = "Medicamentos",
+  "210690" = "Preparaciones alimenticias n.c.p.",
+  "870421" = "Camionetas y camiones di\u00e9sel (hasta 5 t)",
+  "870380" = "Veh\u00edculos el\u00e9ctricos",
+  "870322" = "Autom\u00f3viles a gasolina (1.000-1.500 cc)",
+  "870323" = "Autom\u00f3viles a gasolina (1.500-3.000 cc)",
+  "843049" = "Maquinaria de perforaci\u00f3n",
+  "890190" = "Buques de carga",
+  "040690" = "Quesos",
+  "848180" = "V\u00e1lvulas y grifos",
+  "230990" = "Alimentos para animales",
+  "170199" = "Az\u00facar refinada",
+  "020230" = "Carne bovina deshuesada congelada",
+  "100199" = "Trigo",
+  "150790" = "Aceite de soja refinado",
+  "722830" = "Barras de acero aleado",
+  "841590" = "Partes de aire acondicionado",
+  "847989" = "Otras m\u00e1quinas y aparatos mec\u00e1nicos",
+  "730890" = "Estructuras de hierro o acero",
+  "841199" = "Partes de turbinas de gas",
+  "961900" = "Pa\u00f1ales y productos higi\u00e9nicos",
+  "200410" = "Papas preparadas congeladas"
 )
 
 # Dati ------------------------------------------------------------------------
@@ -133,11 +196,11 @@ g_prodotti <- ggplot(top, aes(x = valore, y = nome, fill = gruppo)) +
   scale_fill_manual(values = colori_gruppi, drop = TRUE, name = NULL) +
   scale_x_continuous(labels = \(x) num_es(x / 1e6),
                      expand = expansion(mult = c(0, 0.2))) +
-  guides(fill = guide_legend(nrow = 2)) +
+  guides(fill = guide_legend(nrow = if (length(livelli_gruppi) > 5) 3 else 2)) +
   labs(
-    title = paste0("Trinidad y Tobago: principales productos de exportaci\u00f3n, ", ultimo_anno),
+    title = paste0("Trinidad y Tobago: ", testi$prodotti, ", ", ultimo_anno),
     subtitle = paste0(
-      "Millones de US$ y participaci\u00f3n en el total exportado (US$ ",
+      "Millones de US$ y participaci\u00f3n en el ", testi$totale, " (US$ ",
       num_es(totale_ultimo / 1e6), " millones). C\u00f3digo SA a 6 d\u00edgitos entre par\u00e9ntesis.\n",
       "Los ", n_top, " principales productos concentran el ",
       num_es(100 * sum(top$quota), 0.1), "% del total."
@@ -148,7 +211,7 @@ g_prodotti <- ggplot(top, aes(x = valore, y = nome, fill = gruppo)) +
   theme(panel.grid.major.y = element_blank(),
         panel.grid.major.x = element_line(colour = colore_griglia, linewidth = 0.4))
 
-ggsave(file.path(cartella_out, paste0("TTO_exportaciones_productos_", ultimo_anno, ".png")),
+ggsave(file.path(cartella_out, paste0("TTO_", flusso, "_productos_", ultimo_anno, ".png")),
        g_prodotti, width = 10.5, height = 7, dpi = 300, bg = "white")
 
 # 2. Composizione per grandi gruppi, anno per anno -------------------------------
@@ -178,12 +241,12 @@ g_gruppi <- ggplot(per_gruppo, aes(x = factor(anno), y = valore,
   scale_fill_manual(values = colori_gruppi, breaks = livelli_gruppi, name = NULL) +
   scale_y_continuous(labels = \(x) num_es(x / 1e6),
                      expand = expansion(mult = c(0, 0.08))) +
-  guides(fill = guide_legend(nrow = 2)) +
+  guides(fill = guide_legend(nrow = if (length(livelli_gruppi) > 5) 3 else 2)) +
   labs(
-    title = paste0("Trinidad y Tobago: exportaciones por grupo de productos, ",
+    title = paste0("Trinidad y Tobago: ", testi$gruppi, ", ",
                    min(anni), "-", ultimo_anno),
     subtitle = paste0(
-      "Millones de US$. Sobre cada barra, el total exportado; dentro, la participaci\u00f3n ",
+      "Millones de US$. Sobre cada barra, el ", testi$totale, "; dentro, la participaci\u00f3n ",
       "de cada grupo (si supera el 4%)."
     ),
     x = NULL, y = NULL, caption = fonte
@@ -193,7 +256,7 @@ g_gruppi <- ggplot(per_gruppo, aes(x = factor(anno), y = valore,
         panel.grid.major.x = element_blank(),
         panel.grid.major.y = element_line(colour = colore_griglia, linewidth = 0.4))
 
-ggsave(file.path(cartella_out, paste0("TTO_exportaciones_grupos_", min(anni), "_", ultimo_anno, ".png")),
+ggsave(file.path(cartella_out, paste0("TTO_", flusso, "_grupos_", min(anni), "_", ultimo_anno, ".png")),
        g_gruppi, width = 10, height = 6.5, dpi = 300, bg = "white")
 
 message("Grafici salvati in ", cartella_out)
