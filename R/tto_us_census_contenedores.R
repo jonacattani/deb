@@ -194,3 +194,61 @@ g <- ggplot(top, aes(x = value, y = capitulo)) +
 
 ggsave(file.path(cartella_grafici, "TTO_US_contenedores_productos.png"),
        g, width = 10, height = 7, dpi = 300, bg = "white")
+
+# ---- Cella 5: dataset per porto ed esportazione ----
+# Valore totale arrivato negli Stati Uniti per porto (tutti i prodotti)
+per_porto <- exp_tto %>%
+  group_by(Port, puerto) %>%
+  summarise(value = sum(.data[[col_valore]], na.rm = TRUE), .groups = "drop") %>%
+  filter(value > 0) %>%
+  mutate(
+    en_red = !is.na(puerto),                                   # TRUE se il porto è un nodo di nodes_P_global
+    nombre = coalesce(puerto, str_remove(Port, ", \\w{2} \\(Port\\)$")),  # nome del nodo, o nome del Census pulito
+    quota  = 100 * value / sum(value)
+  ) %>%
+  select(nombre, puerto, Port, en_red, value, quota) %>%
+  arrange(desc(value))
+
+per_porto
+
+# Esportazione
+write_xlsx(per_porto, file.path(cartella_data, "TTO_US_contenedores_por_puerto.xlsx"))
+
+# ---- Cella 6: grafico per porto ----
+n_top  <- 10
+titolo <- "Trinidad y Tobago: principales puertos de llegada en Estados Unidos de las exportaciones por buque portacontenedores"
+nota   <- "Puerto de entrada declarado en aduanas de Estados Unidos. Todos los productos."
+
+totale <- sum(per_porto$value)
+
+top <- per_porto %>%
+  slice_max(value, n = n_top, with_ties = FALSE) %>%
+  mutate(
+    nombre = fct_reorder(nombre, value),
+    etichetta = paste0(num_es(value / 1e6, 0.1), "  (", num_es(quota, 0.1), "%)")
+  )
+
+g <- ggplot(top, aes(x = value, y = nombre)) +
+  geom_col(fill = colore_barre, width = 0.62) +
+  geom_text(aes(label = etichetta), hjust = 0, nudge_x = max(top$value) * 0.015,
+            size = 3.3, colour = colore_testo_2) +
+  scale_x_continuous(labels = \(x) num_es(x / 1e6),
+                     expand = expansion(mult = c(0, 0.25))) +
+  coord_cartesian(clip = "off") +
+  labs(
+    title = str_wrap(paste0(titolo, ", ", anno), width = 70),
+    subtitle = paste0(
+      "Millones de US$ y participación en el total exportado por contenedor (US$ ",
+      num_es(totale / 1e6, 0.1), " millones).\n",
+      if (nrow(top) < nrow(per_porto))
+        paste0("Los ", nrow(top), " principales puertos concentran el ",
+               num_es(sum(top$quota), 0.1), "% del total.")
+      else "Se muestran todos los puertos."
+    ),
+    x = NULL, y = NULL,
+    caption = paste0(nota, "\n", fonte)
+  ) +
+  tema_barre
+
+ggsave(file.path(cartella_grafici, "TTO_US_contenedores_puertos.png"),
+       g, width = 10, height = 7, dpi = 300, bg = "white")
