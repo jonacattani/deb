@@ -50,6 +50,9 @@ export <- export |>
 
 # Accenti scritti come \u00f3 (= ó) per evitare problemi di codifica del file
 
+# Stessa scala in tutti i grafici: asse da 0 al valore massimo di tutti gli anni
+max_globale <- max(export$valore)
+
 # Formato numeri spagnolo: 1.234,5
 num_es <- function(x, acc = 1) number(x, accuracy = acc, big.mark = ".", decimal.mark = ",")
 
@@ -68,15 +71,15 @@ grafico_anno <- function(a) {
     )
 
   quota_top <- sum(top$quota)
-  max_val <- max(top$valore)
 
   ggplot(top, aes(x = valore, y = paese)) +
     geom_col(fill = colore_barre, width = 0.62) +
-    geom_text(aes(label = etichetta), hjust = 0, nudge_x = max_val * 0.012,
+    geom_text(aes(label = etichetta), hjust = 0, nudge_x = max_globale * 0.012,
               size = 3.3, colour = colore_testo_2) +
     scale_x_continuous(
       labels = \(x) num_es(x / 1e6),
-      expand = expansion(mult = c(0, 0.22))   # spazio a destra per le etichette
+      limits = c(0, max_globale * 1.25),      # +25% di spazio per le etichette
+      expand = expansion(mult = 0)
     ) +
     labs(
       title = paste0("Trinidad y Tobago: principales destinos de exportaci\u00f3n, ", a),
@@ -110,9 +113,16 @@ grafico_anno <- function(a) {
 }
 
 # Esporta un PNG per anno -----------------------------------------------------
+# Tutti i grafici ricevono la stessa larghezza per i nomi dei paesi, cosi'
+# l'area delle barre resta nella stessa posizione in ogni immagine.
 
-for (a in sort(unique(export$anno))) {
-  file_png <- file.path(cartella_out, paste0("TTO_exportaciones_", a, ".png"))
-  ggsave(file_png, grafico_anno(a), width = 9, height = 6.5, dpi = 300, bg = "white")
+anni <- sort(unique(export$anno))
+grafici <- lapply(anni, \(a) ggplotGrob(grafico_anno(a)))
+larghezze <- do.call(grid::unit.pmax, lapply(grafici, \(g) g$widths))
+
+for (i in seq_along(anni)) {
+  grafici[[i]]$widths <- larghezze
+  file_png <- file.path(cartella_out, paste0("TTO_exportaciones_", anni[i], ".png"))
+  ggsave(file_png, grafici[[i]], width = 9, height = 6.5, dpi = 300, bg = "white")
   message("Salvato: ", file_png)
 }
